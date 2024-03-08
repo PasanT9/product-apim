@@ -1,6 +1,6 @@
-<!--<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd" >-->
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd" >
 
-<!--<suite name="apim-automation-tests-suite-2">-->
+<suite name="apim-automation-tests-suite-2">
 <!--    <parameter name="useDefaultListeners" value="false"/>-->
 
 <!--    <test name="apim-restart-tests" preserve-order="true" parallel="false">-->
@@ -20,4 +20,4 @@
 <!--        </classes>-->
 <!--    </test>-->
 
-<!--</suite>-->
+</suite>
