@@ -119,7 +119,7 @@ jobs:
       - name: Checkout product-apim
         uses: actions/checkout@v3
 
-      - name: Resolve carbon-kernel version (4.9.x only)
+      - name: Resolve carbon-kernel version
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -147,7 +147,7 @@ jobs:
           echo "KERNEL_TAG=$TAG" >> "$GITHUB_ENV"
           echo "KERNEL_VERSION=$VERSION" >> "$GITHUB_ENV"
 
-      - name: Decide whether carbon-kernel bump is needed (4.9.x only)
+      - name: Decide whether carbon-kernel bump is needed
         shell: bash
         run: |
           set -euo pipefail
@@ -234,15 +234,15 @@ jobs:
             exit 0
           fi
 
-      - name: Create/update PR (carbon-kernel 4.9.x)
+      - name: Create/update PR (carbon-kernel)
         if: env.BUMP_KERNEL == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
           branch: chore/bump-carbon-kernel
-          title: "Bump carbon-kernel (4.9.x) to ${{ env.KERNEL_VERSION }}"
-          commit-message: "Bump carbon-kernel (4.9.x) to ${{ env.KERNEL_VERSION }}"
+          title: "Bump carbon-kernel to ${{ env.KERNEL_VERSION }}"
+          commit-message: "Bump carbon-kernel to ${{ env.KERNEL_VERSION }}"
           body: |
-            Automated carbon-kernel (4.9.x) bump.
+            Automated carbon-kernel bump.
             Tag: `${{ env.KERNEL_TAG }}`
             Version: `${{ env.KERNEL_VERSION }}`
           labels: dependency-bump
