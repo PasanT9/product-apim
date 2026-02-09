@@ -225,7 +225,7 @@ jobs:
               echo "Missing file: $f"
               exit 1
             fi
-            sed -i -E "s/\b4\.9\.[0-9]+\b/${VERSION}/g" "$f"
+            sed -i -E "s/^(carbon\.version=).*/\1${VERSION}/" "$f"
           done
 
           # If nothing changed, stop
