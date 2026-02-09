@@ -1,0 +1,122 @@
+name: Nightly bump carbon-apimgt version
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Override carbon-apimgt tag (e.g., v9.32.200). Leave empty to use latest."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: nightly-bump-carbon-apimgt
+  cancel-in-progress: true
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout product-apim
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 10
+
+      - name: Resolve carbon-apimgt tag/version (latest or override)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OVERRIDE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+
+          OWNER="pasant9"
+          REPO="carbon-apimgt"
+
+          if [[ -n "${OVERRIDE_TAG}" ]]; then
+            TAG="${OVERRIDE_TAG}"
+            echo "Using override tag: ${TAG}"
+          else
+            TAG=$(gh api "repos/${OWNER}/${REPO}/tags?per_page=1" -q '.[0].name')
+            if [[ -z "${TAG}" || "${TAG}" == "null" ]]; then
+              echo "ERROR: Could not determine latest tag for ${OWNER}/${REPO}"
+              exit 1
+            fi
+            echo "Latest tag: ${TAG}"
+          fi
+
+          # Strip leading 'v' if present
+          VERSION="${TAG#v}"
+
+          # Basic safety: allow only common version chars
+          if [[ ! "${VERSION}" =~ ^[0-9A-Za-z._-]+$ ]]; then
+            echo "ERROR: Invalid version derived from tag: ${VERSION}"
+            exit 1
+          fi
+
+          echo "CARBON_APIMGT_TAG=${TAG}" >> "$GITHUB_ENV"
+          echo "CARBON_APIMGT_VERSION=${VERSION}" >> "$GITHUB_ENV"
+
+          echo "Resolved VERSION=${VERSION}"
+
+      - name: Update carbon.apimgt.version in all poms
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${CARBON_APIMGT_VERSION}"
+
+          FILES=(
+            "api-control-plane/pom.xml"
+            "gateway/pom.xml"
+            "traffic-manager/pom.xml"
+            "all-in-one-apim/pom.xml"
+          )
+
+          for f in "${FILES[@]}"; do
+            if [[ ! -f "$f" ]]; then
+              echo "ERROR: File not found: $f"
+              exit 1
+            fi
+
+            if ! grep -q "<carbon.apimgt.version>" "$f"; then
+              echo "ERROR: <carbon.apimgt.version> not found in $f"
+              exit 1
+            fi
+
+            sed -i "s#<carbon\.apimgt\.version>[^<]*</carbon\.apimgt\.version>#<carbon.apimgt.version>${VERSION}</carbon.apimgt.version>#g" "$f"
+            echo "Updated: $f"
+          done
+
+          echo "Diff:"
+          git diff -- "${FILES[@]}"
+
+          # If nothing changed, exit cleanly (avoid PR noise)
+          if git diff --quiet -- "${FILES[@]}"; then
+            echo "No change detected (already on ${VERSION}). Exiting."
+            exit 0
+          fi
+
+      - name: Create or update rolling PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: chore/bump-carbon-apimgt-nightly
+          title: "Bump carbon-apimgt to ${{ env.CARBON_APIMGT_VERSION }}"
+          commit-message: "Bump carbon-apimgt to ${{ env.CARBON_APIMGT_VERSION }}"
+          body: |
+            Automated bump for carbon-apimgt.
+
+            Tag: `${{ env.CARBON_APIMGT_TAG }}`
+            Version: `${{ env.CARBON_APIMGT_VERSION }}`
+
+            Updated POMs:
+            - api-control-plane/pom.xml
+            - gateway/pom.xml
+            - traffic-manager/pom.xml
+            - all-in-one-apim/pom.xml
+          labels: dependency-bump
