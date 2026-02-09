@@ -191,17 +191,17 @@ jobs:
           )
 
           PRODUCTS=(
-            "api-control-plane/gateway/modules/p2-profile/product/carbon.product"
-            "gateway/gateway/modules/p2-profile/product/carbon.product"
-            "traffic-manager/gateway/modules/p2-profile/product/carbon.product"
-            "all-in-one-apim/gateway/modules/p2-profile/product/carbon.product"
+            "api-control-plane/modules/p2-profile/product/carbon.product"
+            "gateway/modules/p2-profile/product/carbon.product"
+            "traffic-manager/modules/p2-profile/product/carbon.product"
+            "all-in-one-apim/modules/p2-profile/product/carbon.product"
           )
 
           FILTERS=(
-            "api-control-plane/gateway/modules/distribution/product/src/main/assembly/filter.properties"
-            "gateway/gateway/modules/distribution/product/src/main/assembly/filter.properties"
-            "traffic-manager/gateway/modules/distribution/product/src/main/assembly/filter.properties"
-            "all-in-one-apim/gateway/modules/distribution/product/src/main/assembly/filter.properties"
+            "api-control-plane/modules/distribution/product/src/main/assembly/filter.properties"
+            "gateway/modules/distribution/product/src/main/assembly/filter.properties"
+            "traffic-manager/modules/distribution/product/src/main/assembly/filter.properties"
+            "all-in-one-apim/modules/distribution/product/src/main/assembly/filter.properties"
           )
 
           # 1) Update POM property
