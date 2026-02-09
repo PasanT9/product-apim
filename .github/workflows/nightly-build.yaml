@@ -1,12 +1,16 @@
-name: Nightly bump carbon-apimgt version
+name: Nightly Build
 
 on:
   schedule:
     - cron: "0 1 * * *"
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Override carbon-apimgt tag (e.g., v9.32.200). Leave empty to use latest."
+      apimgtTag:
+        description: "Override carbon-apimgt tag (leave empty for latest)"
+        required: false
+        default: ""
+      kernelTag:
+        description: "Override carbon-kernel tag (leave empty for latest)"
         required: false
         default: ""
 
@@ -15,61 +19,43 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: nightly-bump-carbon-apimgt
+  group: nightly-bump-deps
   cancel-in-progress: true
 
 jobs:
-  bump:
+
+  bump-carbon-apimgt:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout product-apim
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 10
 
-      - name: Resolve carbon-apimgt tag/version (latest or override)
+      - name: Resolve carbon-apimgt version
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          OVERRIDE_TAG: ${{ inputs.tag }}
+          OVERRIDE: ${{ inputs.apimgtTag }}
         run: |
-          set -euo pipefail
-
           OWNER="pasant9"
           REPO="carbon-apimgt"
 
-          if [[ -n "${OVERRIDE_TAG}" ]]; then
-            TAG="${OVERRIDE_TAG}"
-            echo "Using override tag: ${TAG}"
+          if [[ -n "$OVERRIDE" ]]; then
+            TAG="$OVERRIDE"
+            echo "Override apimgt tag: $TAG"
           else
-            TAG=$(gh api "repos/${OWNER}/${REPO}/tags?per_page=1" -q '.[0].name')
-            if [[ -z "${TAG}" || "${TAG}" == "null" ]]; then
-              echo "ERROR: Could not determine latest tag for ${OWNER}/${REPO}"
-              exit 1
-            fi
-            echo "Latest tag: ${TAG}"
+            TAG=$(gh api "repos/$OWNER/$REPO/tags?per_page=1" -q '.[0].name')
           fi
 
-          # Strip leading 'v' if present
           VERSION="${TAG#v}"
 
-          # Basic safety: allow only common version chars
-          if [[ ! "${VERSION}" =~ ^[0-9A-Za-z._-]+$ ]]; then
-            echo "ERROR: Invalid version derived from tag: ${VERSION}"
-            exit 1
-          fi
+          echo "APIMGT_TAG=$TAG" >> $GITHUB_ENV
+          echo "APIMGT_VERSION=$VERSION" >> $GITHUB_ENV
 
-          echo "CARBON_APIMGT_TAG=${TAG}" >> "$GITHUB_ENV"
-          echo "CARBON_APIMGT_VERSION=${VERSION}" >> "$GITHUB_ENV"
-
-          echo "Resolved VERSION=${VERSION}"
-
-      - name: Update carbon.apimgt.version in all poms
+      - name: Update apimgt version in all poms
         shell: bash
         run: |
-          set -euo pipefail
-          VERSION="${CARBON_APIMGT_VERSION}"
+          VERSION="$APIMGT_VERSION"
 
           FILES=(
             "api-control-plane/pom.xml"
@@ -79,44 +65,92 @@ jobs:
           )
 
           for f in "${FILES[@]}"; do
-            if [[ ! -f "$f" ]]; then
-              echo "ERROR: File not found: $f"
-              exit 1
-            fi
-
-            if ! grep -q "<carbon.apimgt.version>" "$f"; then
-              echo "ERROR: <carbon.apimgt.version> not found in $f"
-              exit 1
-            fi
-
             sed -i "s#<carbon\.apimgt\.version>[^<]*</carbon\.apimgt\.version>#<carbon.apimgt.version>${VERSION}</carbon.apimgt.version>#g" "$f"
-            echo "Updated: $f"
           done
 
-          echo "Diff:"
-          git diff -- "${FILES[@]}"
-
-          # If nothing changed, exit cleanly (avoid PR noise)
           if git diff --quiet -- "${FILES[@]}"; then
-            echo "No change detected (already on ${VERSION}). Exiting."
+            echo "No APIMGT bump needed"
             exit 0
           fi
 
-      - name: Create or update rolling PR
+      - name: Create/update PR (carbon-apimgt)
         uses: peter-evans/create-pull-request@v6
         with:
           branch: chore/bump-carbon-apimgt-nightly
-          title: "Bump carbon-apimgt to ${{ env.CARBON_APIMGT_VERSION }}"
-          commit-message: "Bump carbon-apimgt to ${{ env.CARBON_APIMGT_VERSION }}"
+          title: "Bump carbon-apimgt to ${{ env.APIMGT_VERSION }}"
+          commit-message: "Bump carbon-apimgt to ${{ env.APIMGT_VERSION }}"
           body: |
-            Automated bump for carbon-apimgt.
+            Automated carbon-apimgt bump.
+            Tag: `${{ env.APIMGT_TAG }}`
+            Version: `${{ env.APIMGT_VERSION }}`
+          labels: dependency-bump
+          
+  bump-carbon-kernel:
+    runs-on: ubuntu-latest
 
-            Tag: `${{ env.CARBON_APIMGT_TAG }}`
-            Version: `${{ env.CARBON_APIMGT_VERSION }}`
+    steps:
+      - name: Checkout product-apim
+        uses: actions/checkout@v3
 
-            Updated POMs:
-            - api-control-plane/pom.xml
-            - gateway/pom.xml
-            - traffic-manager/pom.xml
-            - all-in-one-apim/pom.xml
+      - name: Resolve carbon-kernel version (4.9.x only)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OVERRIDE: ${{ inputs.kernelTag }}
+        run: |
+          OWNER="pasant9"
+          REPO="carbon-kernel"
+
+          is49() {
+            [[ "$1" =~ ^4\.9\.[0-9]+.*$ ]]
+          }
+
+          if [[ -n "$OVERRIDE" ]]; then
+            VERSION="${OVERRIDE#v}"
+            if ! is49 "$VERSION"; then
+              echo "Override tag must be 4.9.x"
+              exit 1
+            fi
+            TAG="$OVERRIDE"
+          else
+            TAG=$(gh api "repos/$OWNER/$REPO/tags?per_page=100" \
+              -q '[.[].name] | map(sub("^v";"")) | map(select(startswith("4.9."))) | .[0]')
+            VERSION="$TAG"
+            TAG="v$VERSION"
+          fi
+
+          echo "KERNEL_TAG=$TAG" >> $GITHUB_ENV
+          echo "KERNEL_VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Update kernel version in all poms
+        shell: bash
+        run: |
+          VERSION="$KERNEL_VERSION"
+
+          FILES=(
+            "api-control-plane/pom.xml"
+            "gateway/pom.xml"
+            "traffic-manager/pom.xml"
+            "all-in-one-apim/pom.xml"
+          )
+
+          for f in "${FILES[@]}"; do
+            sed -i "s#<carbon\.kernel\.version>[^<]*</carbon\.kernel\.version>#<carbon.kernel.version>${VERSION}</carbon.kernel.version>#g" "$f"
+          done
+
+          if git diff --quiet -- "${FILES[@]}"; then
+            echo "No KERNEL bump needed"
+            exit 0
+          fi
+
+      - name: Create/update PR (carbon-kernel 4.9.x)
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: chore/bump-carbon-kernel-49-nightly
+          title: "Bump carbon-kernel (4.9.x) to ${{ env.KERNEL_VERSION }}"
+          commit-message: "Bump carbon-kernel (4.9.x) to ${{ env.KERNEL_VERSION }}"
+          body: |
+            Automated carbon-kernel (4.9.x) bump.
+            Tag: `${{ env.KERNEL_TAG }}`
+            Version: `${{ env.KERNEL_VERSION }}`
           labels: dependency-bump
