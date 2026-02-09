@@ -109,7 +109,6 @@ jobs:
           commit-message: "Bump carbon-apimgt to ${{ env.APIMGT_VERSION }}"
           body: |
             Automated carbon-apimgt bump.
-            Tag: `${{ env.APIMGT_TAG }}`
             Version: `${{ env.APIMGT_VERSION }}`
           labels: dependency-bump
 
@@ -243,6 +242,5 @@ jobs:
           commit-message: "Bump carbon-kernel to ${{ env.KERNEL_VERSION }}"
           body: |
             Automated carbon-kernel bump.
-            Tag: `${{ env.KERNEL_TAG }}`
             Version: `${{ env.KERNEL_VERSION }}`
           labels: dependency-bump
