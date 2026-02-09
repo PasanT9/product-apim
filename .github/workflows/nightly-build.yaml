@@ -2,7 +2,7 @@ name: Nightly Build
 
 on:
   schedule:
-    - cron: "0 1 * * *"
+    - cron: "0 1 * * 0"
   workflow_dispatch:
     inputs:
       apimgtTag:
@@ -76,7 +76,7 @@ jobs:
       - name: Create/update PR (carbon-apimgt)
         uses: peter-evans/create-pull-request@v6
         with:
-          branch: chore/bump-carbon-apimgt-nightly
+          branch: chore/bump-carbon-apimgt
           title: "Bump carbon-apimgt to ${{ env.APIMGT_VERSION }}"
           commit-message: "Bump carbon-apimgt to ${{ env.APIMGT_VERSION }}"
           body: |
@@ -146,7 +146,7 @@ jobs:
       - name: Create/update PR (carbon-kernel 4.9.x)
         uses: peter-evans/create-pull-request@v6
         with:
-          branch: chore/bump-carbon-kernel-49-nightly
+          branch: chore/bump-carbon-kernel
           title: "Bump carbon-kernel (4.9.x) to ${{ env.KERNEL_VERSION }}"
           commit-message: "Bump carbon-kernel (4.9.x) to ${{ env.KERNEL_VERSION }}"
           body: |
