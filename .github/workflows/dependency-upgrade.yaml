@@ -5,12 +5,16 @@ on:
     - cron: "0 1 * * 0"
   workflow_dispatch:
     inputs:
-      apimgtTag:
-        description: "Override carbon-apimgt tag (leave empty for latest)"
+      apimgtVersion:
+        description: "Override carbon-apimgt version (leave empty for latest)"
         required: false
         default: ""
-      kernelTag:
-        description: "Override carbon-kernel tag (leave empty for latest)"
+      kernelVersion:
+        description: "Override carbon-kernel version (leave empty for latest)"
+        required: false
+        default: ""
+      apimAppsVersion:
+        description: "Override apim-apps version (leave empty for latest)"
         required: false
         default: ""
 
@@ -27,16 +31,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout product-apim
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Resolve carbon-apimgt version
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          OVERRIDE: ${{ inputs.apimgtTag }}
+          OVERRIDE: ${{ inputs.apimgtVersion }}
         run: |
           set -euo pipefail
-          OWNER="wso2"
+          OWNER="pasant9"
           REPO="carbon-apimgt"
 
           if [[ -n "$OVERRIDE" ]]; then
@@ -116,16 +120,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout product-apim
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Resolve carbon-kernel version
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          OVERRIDE: ${{ inputs.kernelTag }}
+          OVERRIDE: ${{ inputs.kernelVersion }}
         run: |
           set -euo pipefail
-          OWNER="wso2"
+          OWNER="pasant9"
           REPO="carbon-kernel"
 
           is49() { [[ "$1" =~ ^4\.9\.[0-9]+.*$ ]]; }
@@ -243,4 +247,93 @@ jobs:
           body: |
             Automated carbon-kernel upgrade.
             Version: `${{ env.KERNEL_VERSION }}`
+          labels: dependency-upgrade
+  
+  upgrade-apim-apps-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout product-apim
+        uses: actions/checkout@v4
+
+      - name: Resolve apim-apps version
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OVERRIDE: ${{ inputs.apimAppsVersion }}
+        run: |
+          set -euo pipefail
+          OWNER="pasant9"
+          REPO="apim-apps"
+
+          if [[ -n "$OVERRIDE" ]]; then
+            TAG="$OVERRIDE"
+            echo "Override apim-apps tag: $TAG"
+          else
+            TAG=$(gh api "repos/$OWNER/$REPO/tags?per_page=1" -q '.[0].name')
+          fi
+
+          VERSION="${TAG#v}"
+          echo "APIM_APPS_TAG=$TAG" >> "$GITHUB_ENV"
+          echo "APIM_APPS_VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Decide whether apim-apps upgrade is needed
+        shell: bash
+        run: |
+          set -euo pipefail
+          CANONICAL_POM="api-control-plane/pom.xml"
+          CURRENT=$(mvn -q -f "$CANONICAL_POM" help:evaluate \
+            -Dexpression=carbon.apimgt.ui.version -DforceStdout)
+          TARGET="$APIM_APPS_VERSION"
+
+          echo "Current carbon.apimgt.ui.version: $CURRENT"
+          echo "Target  carbon.apimgt.ui.version: $TARGET"
+
+          if [[ "$CURRENT" == "$TARGET" ]]; then
+            echo "Already at target. Skipping."
+            exit 0
+          fi
+
+          HIGHEST=$(printf "%s\n%s\n" "$CURRENT" "$TARGET" | sort -V | tail -n1)
+          if [[ "$HIGHEST" != "$TARGET" ]]; then
+            echo "Target is not higher than current. Skipping."
+            exit 0
+          fi
+
+          echo "UPGRADE_APIM_APPS=true" >> "$GITHUB_ENV"
+
+      - name: Update apim-apps UI version in pom.xml files
+        if: env.UPGRADE_APIM_APPS == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$APIM_APPS_VERSION"
+
+          POMS=(
+            "api-control-plane/pom.xml"
+            "gateway/pom.xml"
+            "traffic-manager/pom.xml"
+            "all-in-one-apim/pom.xml"
+          )
+
+          for f in "${POMS[@]}"; do
+            sed -i \
+              "s#<carbon\.apimgt\.ui\.version>[^<]*</carbon\.apimgt\.ui\.version>#<carbon.apimgt.ui.version>${VERSION}</carbon.apimgt.ui.version>#g" \
+              "$f"
+          done
+
+          if git diff --quiet -- "${POMS[@]}"; then
+            echo "No apim-apps upgrade needed"
+            exit 0
+          fi
+
+      - name: Create/update PR (apim-apps)
+        if: env.UPGRADE_APIM_APPS == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: chore/upgrade-apim-apps
+          title: "Upgrade apim-apps to ${{ env.APIM_APPS_VERSION }}"
+          commit-message: "Upgrade apim-apps to ${{ env.APIM_APPS_VERSION }}"
+          body: |
+            Automated apim-apps upgrade.
+            Version: `${{ env.APIM_APPS_VERSION }}`
           labels: dependency-upgrade
