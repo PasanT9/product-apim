@@ -1307,10 +1307,10 @@
         <carbon.analytics.common.version>5.3.27</carbon.analytics.common.version>
 
         <!-- APIM Portals Component Version -->
-        <carbon.apimgt.ui.version>9.3.111</carbon.apimgt.ui.version>
+        <carbon.apimgt.ui.version>9.3.112</carbon.apimgt.ui.version>
 
         <!-- APIM Component Version -->
-        <carbon.apimgt.version>9.32.153</carbon.apimgt.version>
+        <carbon.apimgt.version>9.32.155</carbon.apimgt.version>
 
         <carbon.apimgt.imp.pkg.version>[9.0.0, 10.0.0)</carbon.apimgt.imp.pkg.version>
 
@@ -1323,7 +1323,7 @@
         <carbon.governance.version>4.8.37</carbon.governance.version>
 
         <!--carbon versions-->
-        <carbon.kernel.version>4.9.33</carbon.kernel.version>
+        <carbon.kernel.version>4.9.34</carbon.kernel.version>
 
         <cipher.tool.version>1.1.28</cipher.tool.version>
 
@@ -1374,10 +1374,10 @@
         <opencsv.version>1.8</opencsv.version>
         <poi.version>3.0-FINAL</poi.version>
         <woden.version>1.0.0.M8-wso2v1</woden.version>
-        <synapse.version>4.0.0-wso2v262</synapse.version>
+        <synapse.version>4.1.0-wso2v14</synapse.version>
         <passthru.transport.patch.version>1.0.2</passthru.transport.patch.version>
-        <axis2.wso2.version>1.6.1-wso2v111</axis2.wso2.version>
-        <axiom.wso2.version>1.2.11-wso2v29</axiom.wso2.version>
+        <axis2.wso2.version>1.6.1-wso2v80</axis2.wso2.version>
+        <axiom.wso2.version>1.2.11-wso2v21</axiom.wso2.version>
         <servlet-api.version>2.5</servlet-api.version>
         <log4j.version>1.2.13</log4j.version>
         <commons.logging.version>1.1</commons.logging.version>
