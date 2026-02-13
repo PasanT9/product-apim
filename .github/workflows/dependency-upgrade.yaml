@@ -232,6 +232,11 @@ jobs:
 
           echo "::notice::  axis2: $AXIS2"
           echo "::notice::  axiom: $AXIOM"
+          
+      - name: Cleanup temporary synapse checkout
+        shell: bash
+        run: |
+          rm -rf _synapse
 
       # ----------------------------
       # 2) Apply updates
