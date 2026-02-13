@@ -486,10 +486,10 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          branch: chore/dependency-upgrade
-          title: "chore: automated dependency upgrade"
+          branch: dependency-upgrade
+          title: "Automated dependency upgrade"
           commit-message: |
-            chore: update dependencies
+            Update dependencies
 
             - carbon-apimgt: ${{ env.APIMGT_VERSION }}
             - carbon-kernel: ${{ env.KERNEL_VERSION }}
@@ -499,7 +499,6 @@ jobs:
           labels: |
             dependencies
             automated
-            chore
           assignees: ${{ github.actor }}
           draft: false
           delete-branch: true
