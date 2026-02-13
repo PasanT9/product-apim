@@ -351,7 +351,7 @@ jobs:
             echo "::notice::apim-apps target not higher, skipping ($CURRENT_UI ≥ $APIM_APPS_VERSION)"
           fi
 
-          # 4) synapse + axis2 + axiom (atomic update, but allow partial upgrades)
+          # 4) synapse + axis2 + axiom (always align to synapse POM when synapse changes)
           CURRENT_SYNAPSE=$(get_current_version "$CANONICAL_POM" "synapse.version" || true)
           CURRENT_AXIS2=$(get_current_version "$CANONICAL_POM" "axis2.wso2.version" || true)
           CURRENT_AXIOM=$(get_current_version "$CANONICAL_POM" "axiom.wso2.version" || true)
@@ -368,45 +368,28 @@ jobs:
           echo "::notice::Synapse trio current: $CURRENT_SYNAPSE / $CURRENT_AXIS2 / $CURRENT_AXIOM"
           echo "::notice::Synapse trio target : $T_SYN / $T_A2 / $T_AX"
 
-          # Skip only if all equal
+          # Skip only if all three already match
           if [[ "$CURRENT_SYNAPSE" == "$T_SYN" && "$CURRENT_AXIS2" == "$T_A2" && "$CURRENT_AXIOM" == "$T_AX" ]]; then
             echo "::notice::synapse trio unchanged"
           else
-            # Guard against downgrades: each target must be >= current
+            # Only prevent *synapse* downgrade (optional, but sensible)
             if ! is_version_higher "$CURRENT_SYNAPSE" "$T_SYN"; then
               echo "::notice::Target synapse is lower; skipping."
               exit 0
             fi
-            if ! is_version_higher "$CURRENT_AXIS2" "$T_A2"; then
-              echo "::notice::Target axis2 is lower; skipping."
-              exit 0
-            fi
-            if ! is_version_higher "$CURRENT_AXIOM" "$T_AX"; then
-              echo "::notice::Target axiom is lower; skipping."
-              exit 0
-            fi
 
-            # At least one must be strictly higher
-            any_higher=false
-            [[ "$CURRENT_SYNAPSE" != "$T_SYN" ]] && any_higher=true
-            [[ "$CURRENT_AXIS2"  != "$T_A2"  ]] && any_higher=true
-            [[ "$CURRENT_AXIOM"  != "$T_AX"  ]] && any_higher=true
+            echo "::notice::Updating synapse trio to match synapse POM:"
+            echo "::notice::  synapse: $CURRENT_SYNAPSE → $T_SYN"
+            echo "::notice::  axis2  : $CURRENT_AXIS2 → $T_A2"
+            echo "::notice::  axiom  : $CURRENT_AXIOM → $T_AX"
 
-            if [[ "$any_higher" != "true" ]]; then
-              echo "::notice::No effective synapse trio change; skipping."
-            else
-              echo "::notice::Updating synapse trio (partial upgrades allowed):"
-              echo "::notice::  synapse: $CURRENT_SYNAPSE → $T_SYN"
-              echo "::notice::  axis2  : $CURRENT_AXIS2 → $T_A2"
-              echo "::notice::  axiom  : $CURRENT_AXIOM → $T_AX"
-
-              if [[ "$DRY_RUN" != "true" ]]; then
-                update_property_in_poms "synapse.version" "$T_SYN" "${POM_FILES_ARRAY[@]}"
-                update_property_in_poms "axis2.wso2.version" "$T_A2" "${POM_FILES_ARRAY[@]}"
-                update_property_in_poms "axiom.wso2.version" "$T_AX" "${POM_FILES_ARRAY[@]}"
-              fi
+            if [[ "$DRY_RUN" != "true" ]]; then
+              update_property_in_poms "synapse.version" "$T_SYN" "${POM_FILES_ARRAY[@]}"
+              update_property_in_poms "axis2.wso2.version" "$T_A2" "${POM_FILES_ARRAY[@]}"
+              update_property_in_poms "axiom.wso2.version" "$T_AX" "${POM_FILES_ARRAY[@]}"
             fi
           fi
+
 
 
       # ----------------------------
