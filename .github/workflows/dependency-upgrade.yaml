@@ -126,8 +126,6 @@ jobs:
           set -euo pipefail
           
           # Common functions
-          debug_log() { [[ "$DEBUG" == "true" ]] && echo "::debug::$1" || true; }
-          
           retry_gh_api() {
             local url="$1"
             local jq_filter="$2"
@@ -140,7 +138,6 @@ jobs:
                 return 0
               fi
               retry_count=$((retry_count + 1))
-              debug_log "API call failed, retrying ($retry_count/$max_retries)..."
               sleep $((retry_count * 2))
             done
             
@@ -175,19 +172,15 @@ jobs:
           }
           
           # Resolve all versions
-          debug_log "Resolving carbon-apimgt version..."
           APIMGT_TAG=$(resolve_latest_tag "$APIMGT_REPO" "${{ inputs.apimgtVersion }}")
           echo "APIMGT_VERSION=${APIMGT_TAG#v}" >> "$GITHUB_ENV"
-          
-          debug_log "Resolving carbon-kernel version..."
+
           KERNEL_VERSION=$(resolve_kernel_version "$KERNEL_REPO" "${{ inputs.kernelVersion }}")
           echo "KERNEL_VERSION=$KERNEL_VERSION" >> "$GITHUB_ENV"
           
-          debug_log "Resolving apim-apps version..."
           APIM_APPS_TAG=$(resolve_latest_tag "$APIM_APPS_REPO" "${{ inputs.apimAppsVersion }}")
           echo "APIM_APPS_VERSION=${APIM_APPS_TAG#v}" >> "$GITHUB_ENV"
           
-          debug_log "Resolving synapse version..."
           SYNAPSE_TAG=$(resolve_latest_tag "$SYNAPSE_REPO" "${{ inputs.synapseVersion }}")
           echo "SYNAPSE_TAG=$SYNAPSE_TAG" >> "$GITHUB_ENV"
           echo "SYNAPSE_VERSION=${SYNAPSE_TAG#v}" >> "$GITHUB_ENV"
@@ -212,15 +205,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          
+
           POM="_synapse/pom.xml"
           if [[ ! -f "$POM" ]]; then
             echo "::error::Synapse pom.xml not found at $POM"
             exit 1
           fi
-          
-          debug_log "Extracting axis2/axiom versions from synapse pom.xml..."
-          
           # Extract versions with better error handling
           if ! AXIS2=$(mvn -q -f "$POM" help:evaluate -Dexpression=axis2.version -DforceStdout 2>/dev/null); then
             echo "::error::Failed to extract axis2.version from synapse pom.xml"
@@ -252,8 +242,6 @@ jobs:
           set -euo pipefail
           
           # Common functions for updates
-          debug_log() { [[ "$DEBUG" == "true" ]] && echo "::debug::$1" || true; }
-          
           get_current_version() {
             local pom="$1"
             local property="$2"
@@ -280,7 +268,6 @@ jobs:
                 echo "::warning::File not found, skipping: $file"
                 continue
               fi
-              debug_log "Updating $property to $new_value in $file"
               sed -i "s#<${property}>[^<]*</${property}>#<${property}>${new_value}</${property}>#g" "$file"
             done
           }
@@ -289,7 +276,6 @@ jobs:
           read -ra POM_FILES_ARRAY <<< "$POM_FILES"
           
           # 1) Update carbon-apimgt
-          debug_log "Processing carbon-apimgt update..."
           CURRENT_APIMGT=$(get_current_version "$CANONICAL_POM" "carbon.apimgt.version")
           if [[ "$CURRENT_APIMGT" == "$APIMGT_VERSION" ]]; then
             echo "::notice::carbon-apimgt unchanged ($CURRENT_APIMGT)"
@@ -301,7 +287,6 @@ jobs:
           fi
           
           # 2) Update carbon-kernel (with related properties)
-          debug_log "Processing carbon-kernel update..."
           CURRENT_KERNEL=$(get_current_version "$CANONICAL_POM" "carbon.kernel.version")
           if [[ ! "$CURRENT_KERNEL" =~ ^4\.9\.[0-9]+ ]] || [[ ! "$KERNEL_VERSION" =~ ^4\.9\.[0-9]+ ]]; then
             echo "::warning::Kernel versions not in 4.9.x series, skipping (current: $CURRENT_KERNEL, target: $KERNEL_VERSION)"
@@ -319,7 +304,6 @@ jobs:
           fi
           
           # 3) Update apim-apps UI
-          debug_log "Processing apim-apps update..."
           CURRENT_UI=$(get_current_version "$CANONICAL_POM" "carbon.apimgt.ui.version")
           if [[ "$CURRENT_UI" == "$APIM_APPS_VERSION" ]]; then
             echo "::notice::apim-apps unchanged ($CURRENT_UI)"
@@ -331,7 +315,6 @@ jobs:
           fi
           
           # 4) Update synapse+axis2+axiom (atomic update)
-          debug_log "Processing synapse trio update..."
           CURRENT_SYNAPSE=$(get_current_version "$CANONICAL_POM" "synapse.version")
           CURRENT_AXIS2=$(get_current_version "$CANONICAL_POM" "axis2.wso2.version")
           CURRENT_AXIOM=$(get_current_version "$CANONICAL_POM" "axiom.wso2.version")
@@ -363,12 +346,9 @@ jobs:
         run: |
           set -euo pipefail
           
-          debug_log() { [[ "$DEBUG" == "true" ]] && echo "::debug::$1" || true; }
-          
           # Basic validation that files are still valid XML
           for pom in $POM_FILES; do
             if [[ -f "$pom" ]]; then
-              debug_log "Validating XML syntax for $pom"
               if ! xmllint --noout "$pom" 2>/dev/null; then
                 echo "::error::Invalid XML syntax in $pom after updates"
                 exit 1
@@ -377,7 +357,6 @@ jobs:
           done
           
           # Verify Maven can parse the updated POMs
-          debug_log "Validating Maven can parse updated files..."
           if ! mvn -q validate -f "$CANONICAL_POM" >/dev/null 2>&1; then
             echo "::error::Maven validation failed for updated files"
             exit 1
