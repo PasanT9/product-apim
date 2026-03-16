@@ -268,6 +268,12 @@
             <class name="org.wso2.am.integration.tests.other.NewCopyWithDefaultVersion"/>
             <class name="org.wso2.am.integration.tests.other.SameVersionAPITestCase"/>
             <class name="org.wso2.am.integration.tests.other.APIM678ApplicationCreationTestCase"/>
+        </classes>
+    </test>
+
+    <test name="apim-devportal-tests" preserve-order="true" parallel="false" group-by-instances="true">
+        <parameter name="group" value="group3"/>
+        <classes>
             <class name="org.wso2.am.integration.tests.other.APIM714GetAllDocumentationTestCase"/>
             <class name="org.wso2.am.integration.tests.other.LoadBalancedEndPointTestCase"/>
             <class name="org.wso2.am.integration.tests.other.APIM720GetAllEndPointsTestCase"/>
