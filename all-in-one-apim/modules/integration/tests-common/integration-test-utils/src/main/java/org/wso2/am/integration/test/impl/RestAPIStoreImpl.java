@@ -32,6 +32,7 @@ import org.wso2.am.integration.clients.store.api.ApiResponse;
 import org.wso2.am.integration.clients.store.api.v1.ApIsApi;
 import org.wso2.am.integration.clients.store.api.v1.ApiKeysApi;
 import org.wso2.am.integration.clients.store.api.v1.ApplicationKeysApi;
+import org.wso2.am.integration.clients.store.api.v1.ApplicationSecretsApi;
 import org.wso2.am.integration.clients.store.api.v1.ApplicationsApi;
 import org.wso2.am.integration.clients.store.api.v1.CommentsApi;
 import org.wso2.am.integration.clients.store.api.v1.GraphQlPoliciesApi;
@@ -61,6 +62,10 @@ import org.wso2.am.integration.clients.store.api.v1.dto.ApplicationKeyListDTO;
 import org.wso2.am.integration.clients.store.api.v1.dto.ApplicationKeyMappingRequestDTO;
 import org.wso2.am.integration.clients.store.api.v1.dto.ApplicationKeyReGenerateResponseDTO;
 import org.wso2.am.integration.clients.store.api.v1.dto.ApplicationListDTO;
+import org.wso2.am.integration.clients.store.api.v1.dto.ConsumerSecretCreationRequestDTO;
+import org.wso2.am.integration.clients.store.api.v1.dto.ConsumerSecretDeletionRequestDTO;
+import org.wso2.am.integration.clients.store.api.v1.dto.ConsumerSecretDTO;
+import org.wso2.am.integration.clients.store.api.v1.dto.ConsumerSecretListDTO;
 import org.wso2.am.integration.clients.store.api.v1.dto.ApplicationThrottleResetDTO;
 import org.wso2.am.integration.clients.store.api.v1.dto.CommentDTO;
 import org.wso2.am.integration.clients.store.api.v1.dto.CommentListDTO;
@@ -124,6 +129,7 @@ public class RestAPIStoreImpl {
     public TopicsApi topicsApi = new TopicsApi();
     public WebhooksApi webhooksApi = new WebhooksApi();
     public McpServersApi mcpServersApi = new McpServersApi();
+    public ApplicationSecretsApi applicationSecretsApi = new ApplicationSecretsApi();
     public String storeURL;
     public String tenantDomain;
     ApiClient apiStoreClient = new ApiClient();
@@ -164,6 +170,7 @@ public class RestAPIStoreImpl {
         usersApi.setApiClient(apiStoreClient);
         throttlingPoliciesApi.setApiClient(apiStoreClient);
         mcpServersApi.setApiClient(apiStoreClient);
+        applicationSecretsApi.setApiClient(apiStoreClient);
         apiStoreClient.setDebugging(true);
         this.storeURL = storeURL;
         this.tenantDomain = tenantDomain;
@@ -182,6 +189,7 @@ public class RestAPIStoreImpl {
         tagsApi.setApiClient(apiStoreClient);
         keyManagersCollectionApi.setApiClient(apiStoreClient);
         usersApi.setApiClient(apiStoreClient);
+        applicationSecretsApi.setApiClient(apiStoreClient);
         this.storeURL = storeURL;
         this.tenantDomain = tenantDomain;
         this.restAPIGateway = new RestAPIGatewayImpl(this.username, this.password, tenantDomain);
@@ -441,6 +449,42 @@ public class RestAPIStoreImpl {
         } catch (ApiException e) {
             response = new HttpResponse(e.getResponseBody(), e.getCode());
             return response;
+        }
+    }
+
+    /**
+     * Updates an existing application with the provided details and custom attributes.
+     *
+     * @param applicationId The unique identifier of the application to be updated.
+     * @param appName The new name of the application.
+     * @param description The updated description of the application.
+     * @param throttleTier The throttling policy (application tier) to be applied to the application.
+     * @param attributes A map containing custom application attributes to be associated with the application.
+     *
+     * @return {@link HttpResponse} containing the response body and HTTP status code.
+     * Returns status code {@code 200} if the application update is successful. If an error occurs,
+     * the response will contain the error body and the corresponding HTTP status code returned by the API.
+     */
+    public HttpResponse updateApplicationByID(String applicationId, String appName,
+                                              String description, String throttleTier, Map<String, String> attributes) {
+
+        try {
+            ApplicationDTO application = new ApplicationDTO();
+            application.setName(appName);
+            application.setDescription(description);
+            application.setThrottlingPolicy(throttleTier);
+            application.setAttributes(attributes);
+
+            ApplicationDTO updatedApp = applicationsApi.applicationsApplicationIdPut(applicationId, application, null);
+            HttpResponse response = null;
+            if (StringUtils.isNotEmpty(updatedApp.getApplicationId())) {
+                response = new HttpResponse(updatedApp.toString(), 200);
+            }
+            return response;
+        } catch (ApiException e) {
+            String responseBody = e.getResponseBody();
+            int statusCode = e.getCode();
+            return new HttpResponse(responseBody, statusCode);
         }
     }
 
@@ -2154,7 +2198,29 @@ public class RestAPIStoreImpl {
 
         ApiResponse<String> response =
                 apIsApi.apisApiIdSwaggerGetWithHttpInfo(apiId, Constants.GATEWAY_ENVIRONMENT, null, tenantDomain);
-        Assert.assertEquals(HttpStatus.SC_OK, response.getStatusCode());
+        Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
+        return response.getData();
+    }
+
+    /**
+     * Retrieve the Swagger definition of an API from the Developer Portal.
+     * <p>
+     * When {@code environmentName} is {@code null}, the gateway environment (and hence the {@code servers} URL) is
+     * resolved internally by the server based on the environments the API is actually deployed to. This mirrors the
+     * real Developer Portal invocation (GET /apis/{apiId}/swagger without the environmentName query parameter) and is
+     * required to exercise the server side environment resolution logic.
+     *
+     * @param apiId           API UUID
+     * @param environmentName gateway environment name, or {@code null} to let the server resolve it
+     * @param tenantDomain    tenant domain
+     * @return the Swagger definition as a String
+     * @throws ApiException if the REST call fails
+     */
+    public String getSwaggerByID(String apiId, String environmentName, String tenantDomain) throws ApiException {
+
+        ApiResponse<String> response =
+                apIsApi.apisApiIdSwaggerGetWithHttpInfo(apiId, environmentName, null, tenantDomain);
+        Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
         return response.getData();
     }
 
@@ -2411,5 +2477,20 @@ public class RestAPIStoreImpl {
     
     public OrganizationInfoDTO getUserOrganization() throws ApiException {
         return usersApi.organizationInformation();
+    }
+
+    public ConsumerSecretDTO generateConsumerSecret(String applicationId, String keyMappingId,
+            ConsumerSecretCreationRequestDTO request) throws ApiException {
+        return applicationSecretsApi.generateConsumerSecret(applicationId, keyMappingId, request);
+    }
+
+    public ConsumerSecretListDTO getConsumerSecrets(String applicationId, String keyMappingId)
+            throws ApiException {
+        return applicationSecretsApi.getConsumerSecrets(applicationId, keyMappingId);
+    }
+
+    public void revokeConsumerSecret(String applicationId, String keyMappingId,
+            ConsumerSecretDeletionRequestDTO request) throws ApiException {
+        applicationSecretsApi.revokeConsumerSecret(applicationId, keyMappingId, request);
     }
 }
